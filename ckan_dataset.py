@@ -45,9 +45,6 @@ class CKANDataset(Plugin):
         # Element 0 is empty
         splitted_path = parsed_url.path.split('/')
 
-        # Create headers for the requests
-        headers = {'X-Auth-token': provider.userprofile.access_token}
-
         if len(splitted_path) < 3:
             raise PermissionDenied('Invalid resource: The provided URL does not point to a valid CKAN dataset')
 
@@ -55,6 +52,9 @@ class CKANDataset(Plugin):
             raise PermissionDenied('Invalid resource: The provided URL does not point to a valid CKAN dataset')
 
         dataset_id = splitted_path[2]
+
+        # Create headers for the requests
+        headers = {'X-Auth-token': provider.userprofile.access_token}
 
         # Get dataset metainfo
         meta_url = urljoin(ckan_server, 'api/action/dataset_show?id=' + dataset_id)
