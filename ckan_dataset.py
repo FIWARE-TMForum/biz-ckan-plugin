@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015 CoNWeT Lab., Universidad Politécnica de Madrid
+# Copyright (c) 2015 - 2016 CoNWeT Lab., Universidad Politécnica de Madrid
 
 # This file is part of WStore CKAN plugin.
 
@@ -22,7 +22,7 @@
 import requests
 
 from django.core.exceptions import PermissionDenied
-from wstore.offerings.resource_plugins.plugin import Plugin
+from wstore.asset_manager.resource_plugins.plugin import Plugin
 from urlparse import urlparse, urljoin
 
 
@@ -84,40 +84,7 @@ class CKANDataset(Plugin):
         if user_info['result']['name'] != provider.username:
             raise PermissionDenied('Invalid resource: The user is not the owner of the dataset')
 
-    def on_pre_create_validation(self, provider, data, file_=None):
-        self.check_user_is_owner(provider, data['link'])
+    def on_pre_product_spec_validation(self, provider, asset_t, media_type, url):
+        self.check_user_is_owner(provider, url)
         return data
 
-    def on_post_create_validation(self, provider, data, file_=None):
-        pass
-
-    def on_pre_create(self, provider, data):
-        pass
-
-    def on_post_create(self, resource):
-        pass
-
-    def on_pre_update(self, resource):
-        pass
-
-    def on_post_update(self, resource):
-        pass
-
-    def on_pre_upgrade_validation(self, resource, data, file_=None):
-        self.check_user_is_owner(provider, data['link'])
-        return data
-
-    def on_post_upgrade_validation(self, resource, data, file_=None):
-        pass
-
-    def on_pre_upgrade(self, resource):
-        pass
-
-    def on_post_upgrade(self, resource):
-        pass
-
-    def on_pre_delete(self, resource):
-        pass
-
-    def on_post_delete(self, resource):
-        pass
