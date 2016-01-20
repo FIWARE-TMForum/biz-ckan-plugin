@@ -20,10 +20,12 @@
 # If not, see <https://joinup.ec.europa.eu/software/page/eupl/licence-eupl>.
 
 import requests
+from urlparse import urlparse, urljoin
 
 from django.core.exceptions import PermissionDenied
+
 from wstore.asset_manager.resource_plugins.plugin import Plugin
-from urlparse import urlparse, urljoin
+from wstore.models import User
 
 
 class CKANDataset(Plugin):
@@ -36,6 +38,11 @@ class CKANDataset(Plugin):
             raise PermissionDenied('Invalid resource: The CKAN server is not responding')
 
     def check_user_is_owner(self, provider, url):
+
+        if not provider.private:
+            raise ValueError('FIWARE Organization datasets are not supported')
+
+        user = User.objects.get(username=provider.name)
 
         # Get CKAN server URL
         parsed_url = urlparse(url)
@@ -54,7 +61,7 @@ class CKANDataset(Plugin):
         dataset_id = splitted_path[2]
 
         # Create headers for the requests
-        headers = {'X-Auth-token': provider.userprofile.access_token}
+        headers = {'X-Auth-token': user.userprofile.access_token}
 
         # Get dataset metainfo
         meta_url = urljoin(ckan_server, 'api/action/dataset_show?id=' + dataset_id)
@@ -81,10 +88,9 @@ class CKANDataset(Plugin):
         user_info = user_info_res.json()
 
         # Validate owner
-        if user_info['result']['name'] != provider.username:
+        if user_info['result']['name'] != user.username:
             raise PermissionDenied('Invalid resource: The user is not the owner of the dataset')
 
     def on_pre_product_spec_validation(self, provider, asset_t, media_type, url):
         self.check_user_is_owner(provider, url)
-        return data
 
