@@ -116,12 +116,10 @@ class CKANDataset(Plugin):
 
         # Notify the dataset acquisition to CKAN
         headers = {'Content-type': 'application/json'}
-        try:
-            requests.post(
-                notification_url,
-                json=data,
-                headers=headers,
-                cert=(settings.NOTIF_CERT_FILE, settings.NOTIF_CERT_KEY_FILE)
-            )
-        except:
-            pass
+        response = requests.post(
+            notification_url,
+            json=data,
+            headers=headers,
+            cert=(settings.NOTIF_CERT_FILE, settings.NOTIF_CERT_KEY_FILE)
+        )
+        response.raise_for_status()
