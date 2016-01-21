@@ -64,7 +64,7 @@ class CKANDataset(Plugin):
         headers = {'X-Auth-token': user.userprofile.access_token}
 
         # Get dataset metainfo
-        meta_url = urljoin(ckan_server, 'api/action/dataset_show?id=' + dataset_id)
+        meta_url = urljoin(ckan_server, 'api/action/package_show?id=' + dataset_id)
         meta_info_res = self.get_request(meta_url, headers=headers)
 
         if meta_info_res.status_code != 200:
