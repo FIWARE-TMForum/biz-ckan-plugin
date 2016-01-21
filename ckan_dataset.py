@@ -23,6 +23,7 @@ import requests
 from urlparse import urlparse, urljoin
 
 from django.core.exceptions import PermissionDenied
+from django.conf import settings
 
 from wstore.asset_manager.resource_plugins.plugin import Plugin
 from wstore.models import User
@@ -37,16 +38,10 @@ class CKANDataset(Plugin):
         except requests.ConnectionError:
             raise PermissionDenied('Invalid resource: The CKAN server is not responding')
 
-    def check_user_is_owner(self, provider, url):
 
-        if not provider.private:
-            raise ValueError('FIWARE Organization datasets are not supported')
-
-        user = User.objects.get(username=provider.name)
-
-        # Get CKAN server URL
+    def get_ckan_info(self, url):
         parsed_url = urlparse(url)
-        ckan_server = parsed_url.scheme + '://' + parsed_url.netloc
+        ckan_server =  parsed_url.scheme + '://' + parsed_url.netloc
 
         # Extract dataset ID
         # Element 0 is empty
@@ -59,6 +54,18 @@ class CKANDataset(Plugin):
             raise PermissionDenied('Invalid resource: The provided URL does not point to a valid CKAN dataset')
 
         dataset_id = splitted_path[2]
+
+        return ckan_server, dataset_id
+
+    def check_user_is_owner(self, provider, url):
+
+        if not provider.private:
+            raise ValueError('FIWARE Organization datasets are not supported')
+
+        user = User.objects.get(username=provider.name)
+
+        # Get CKAN server URL
+        ckan_server, dataset_id = self.get_ckan_info(url)
 
         # Create headers for the requests
         headers = {'X-Auth-token': user.userprofile.access_token}
@@ -94,3 +101,27 @@ class CKANDataset(Plugin):
     def on_pre_product_spec_validation(self, provider, asset_t, media_type, url):
         self.check_user_is_owner(provider, url)
 
+    def on_product_acquisition(self, asset, contract, order):
+        # Build notification URL
+        ckan_server, dataset_id = self.get_ckan_info(asset.get_url())
+        notification_url = urljoin(ckan_server, '/api/action/package_acquired')
+
+        # Build notification data
+        data = {
+            'customer_name': order.owner_organization.name,
+            'resources': [{
+                'url': asset.get_url()
+            }]
+        }
+
+        # Notify the dataset acquisition to CKAN
+        headers = {'Content-type': 'application/json'}
+        try:
+            requests.post(
+                notification_url,
+                json=data,
+                headers=headers,
+                cert=(settings.NOTIF_CERT_FILE, settings.NOTIF_CERT_KEY_FILE)
+            )
+        except:
+            pass
