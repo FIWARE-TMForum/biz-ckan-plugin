@@ -1,7 +1,7 @@
 {
     "name": "CKAN Dataset",
     "author": "amagan",
-    "version": "1.0",
+    "version": "0.2",
     "module": "ckan_dataset.CKANDataset",
     "media_types": [],
     "formats": ["URL"],

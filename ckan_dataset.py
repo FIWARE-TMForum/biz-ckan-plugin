@@ -101,10 +101,10 @@ class CKANDataset(Plugin):
     def on_pre_product_spec_validation(self, provider, asset_t, media_type, url):
         self.check_user_is_owner(provider, url)
 
-    def on_product_acquisition(self, asset, contract, order):
+    def _manage_notification(self, path, asset, order):
         # Build notification URL
         ckan_server, dataset_id = self.get_ckan_info(asset.get_url())
-        notification_url = urljoin(ckan_server, '/api/action/package_acquired')
+        notification_url = urljoin(ckan_server, path)
 
         # Build notification data
         data = {
@@ -123,3 +123,9 @@ class CKANDataset(Plugin):
             cert=(settings.NOTIF_CERT_FILE, settings.NOTIF_CERT_KEY_FILE)
         )
         response.raise_for_status()
+
+    def on_product_acquisition(self, asset, contract, order):
+        self._manage_notification('/api/action/package_acquired', asset, order)
+
+    def on_product_suspension(self, asset, contract, order):
+        self._manage_notification('/api/action/revoke_access', asset, order)
