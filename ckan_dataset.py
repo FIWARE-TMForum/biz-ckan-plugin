@@ -39,7 +39,6 @@ class CKANDataset(Plugin):
         except requests.ConnectionError:
             raise PermissionDenied('Invalid resource: The CKAN server is not responding')
 
-
     def get_ckan_info(self, url):
         parsed_url = urlparse(url)
         ckan_server =  parsed_url.scheme + '://' + parsed_url.netloc
