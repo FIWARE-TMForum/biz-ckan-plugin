@@ -6,5 +6,6 @@
     "media_types": [],
     "formats": ["URL"],
     "overrides": [],
+    "pull_accounting": true,
     "form": { }
 }

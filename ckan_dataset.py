@@ -27,10 +27,17 @@ from django.core.exceptions import PermissionDenied
 from django.conf import settings
 
 from wstore.asset_manager.resource_plugins.plugin import Plugin
+from wstore.asset_manager.resource_plugins.plugin_error import PluginError
 from wstore.models import User
+
+from .settings import UNITS
 
 
 class CKANDataset(Plugin):
+
+    def __init__(self, plugin_model):
+        super(plugin_model)
+        self._units = UNITS
 
     def get_request(self, *args, **kwargs):
 
@@ -57,18 +64,12 @@ class CKANDataset(Plugin):
 
         return ckan_server, dataset_id
 
-    def check_user_is_owner(self, provider, url):
-
-        if not provider.private:
-            raise ValueError('FIWARE Organization datasets are not supported')
-
-        user = User.objects.get(username=provider.name)
-
+    def _get_dataset_info(self, url, token):
         # Get CKAN server URL
         ckan_server, dataset_id = self.get_ckan_info(url)
 
         # Create headers for the requests
-        headers = {'X-Auth-token': user.userprofile.access_token}
+        headers = {'X-Auth-token': token}
 
         # Get dataset metainfo
         meta_url = urljoin(ckan_server, 'api/action/package_show?id=' + dataset_id)
@@ -79,10 +80,24 @@ class CKANDataset(Plugin):
                         'The user is not authorized to access the dataset'
             raise PermissionDenied('Invalid resource: %s' % error_msg)
 
-        meta_info = meta_info_res.json()
+        return meta_info_res.json()
+
+    def check_user_is_owner(self, provider, url):
+
+        if not provider.private:
+            raise ValueError('FIWARE Organization datasets are not supported')
+
+        user = User.objects.get(username=provider.name)
+
+        meta_info = self._get_dataset_info(url, user.userprofile.access_token)
         user_id = meta_info['result']['creator_user_id']
 
         # Get user info
+        # Get CKAN server URL
+        ckan_server, dataset_id = self.get_ckan_info(url)
+        # Create headers for the requests
+        headers = {'X-Auth-token': user.userprofile.access_token}
+
         user_url = urljoin(ckan_server, 'api/action/user_show?id=' + user_id)
         user_info_res = self.get_request(user_url, headers=headers)
 
@@ -100,6 +115,34 @@ class CKANDataset(Plugin):
 
     def on_pre_product_spec_validation(self, provider, asset_t, media_type, url):
         self.check_user_is_owner(provider, url)
+
+    def on_post_product_spec_validation(self, provider, asset):
+        # Read CKAN dataset resources in order to determine the broker URLs
+        token = User.objects.get(username=provider.name).userprofile.access_token
+        dataset_info = self._get_dataset_info(asset.get_url(), token)['result']
+
+        for resource in dataset_info['resources']:
+            # If the CKAN resource is a URL, save it in order to enable activation and accounting
+
+            if 'url' in resource and len(resource['url']) > 0:
+
+                if 'resources' not in asset.meta_info:
+                    asset.meta_info['resources'] = []
+
+                asset.meta_info['resources'].append(resource['url'])
+
+        # TODO: Validate that the URL refers to an API umbrella proxy
+        asset.save()
+
+    def on_post_product_offering_validation(self, asset, product_offering):
+        # Validate that the pay-per-use model (if any) is supported by the backend
+        if 'productOfferingPrice' in product_offering:
+            supported_units = [unit['name'].lower() for unit in self._units]
+
+            for price_model in product_offering['productOfferingPrice']:
+                if price_model['priceType'] == 'usage' and price_model['unitOfMeasure'].lower() not in supported_units:
+                    raise PluginError('Unsupported accounting unit ' +
+                                      price_model['unit'] + '. Supported units are: ' + ','.join(supported_units))
 
     def _manage_notification(self, path, asset, order):
         # Build notification URL
@@ -129,3 +172,14 @@ class CKANDataset(Plugin):
 
     def on_product_suspension(self, asset, contract, order):
         self._manage_notification('/api/action/revoke_access', asset, order)
+
+    ####################################################################
+    #######################  Accounting Handlers #######################
+    ####################################################################
+
+    def get_usage_specs(self):
+        return self._units
+
+    def get_pending_accounting(self, asset, contract, order):
+        # Read pricing model to know the query to make
+        pass
