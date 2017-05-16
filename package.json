@@ -1,11 +1,18 @@
 {
-    "name": "CKAN Dataset",
-    "author": "amagan",
+    "name": "CKAN API Dataset",
+    "author": "fdelavega",
     "version": "0.2",
     "module": "ckan_dataset.CKANDataset",
     "media_types": [],
     "formats": ["URL"],
     "overrides": [],
     "pull_accounting": true,
-    "form": { }
+    "form": {
+        "role": {
+            "type": "text",
+            "label": "Acquisition Role",
+            "placeholder": "Acquisition Role",
+            "mandatory": true
+        }
+    }
 }
