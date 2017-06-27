@@ -33,8 +33,9 @@ from wstore.asset_manager.resource_plugins.plugin import Plugin
 from wstore.asset_manager.resource_plugins.plugin_error import PluginError
 from wstore.models import User
 
-from settings import UNITS, UMBRELLA_KEY, UMBRELLA_ADMIN_TOKEN
+from settings import UNITS
 from umbrella_client import UmbrellaClient
+from keystone_client import KeystoneClient
 
 
 class CKANDataset(Plugin):
@@ -200,6 +201,9 @@ class CKANDataset(Plugin):
         # Activate API resources
         if 'resources' in asset.meta_info:
             for resource in asset.meta_info['resources']:
+                keystone_client = KeystoneClient()
+                keystone_client.grant_permission(order.customer, resource, asset.meta_info['role'])
+
                 client = self._get_api_client(resource)
                 client.update_user_role(order.customer.email, asset.meta_info['role'])
 
@@ -210,6 +214,9 @@ class CKANDataset(Plugin):
         # Suspend API Resources
         if 'resources' in asset.meta_info:
             for resource in asset.meta_info['resources']:
+                keystone_client = KeystoneClient()
+                keystone_client.revoke_permission(order.customer, resource, asset.meta_info['role'])
+
                 client = self._get_api_client(resource)
                 client.revoke_user_role(order.customer.email, asset.meta_info['role'])
 

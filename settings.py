@@ -23,4 +23,10 @@ UNITS = [{
     'name': 'Api call',
     'description': 'The final price is calculated based on the number of calls made to the API'
 }]
-UMBRELLA_KEY = 'key'
+
+UMBRELLA_KEY = 'LWmOjZMTuaZp5BwNI3GsNsdsR6Sq3YqBHUcUj9Fw'
+UMBRELLA_ADMIN_TOKEN = 'JDLlA0iRw5lYbT1ucKcP3AwT6eGtbsBgqoUf2RyV'
+
+KEYSTONE_USER = 'idm'
+KEYSTONE_PASSWORD = 'idm'
+KEYSTONE_HOST = ''
