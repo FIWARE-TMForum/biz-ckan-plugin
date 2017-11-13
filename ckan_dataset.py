@@ -204,6 +204,9 @@ class CKANDataset(Plugin):
                 keystone_client = KeystoneClient()
                 keystone_client.grant_permission(order.customer, resource, asset.meta_info['role'])
 
+                # Set the role in BAE scope
+                keystone_client.grant_permission(order.customer, settings.SITE, asset.meta_info['role'])
+
                 client = self._get_api_client(resource)
                 client.update_user_role(order.customer.email, asset.meta_info['role'])
 
@@ -216,6 +219,9 @@ class CKANDataset(Plugin):
             for resource in asset.meta_info['resources']:
                 keystone_client = KeystoneClient()
                 keystone_client.revoke_permission(order.customer, resource, asset.meta_info['role'])
+
+                # Revoke the role in BAE scope
+                keystone_client.revoke_permission(order.customer, settings.SITE, asset.meta_info['role'])
 
                 client = self._get_api_client(resource)
                 client.revoke_user_role(order.customer.email, asset.meta_info['role'])
