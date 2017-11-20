@@ -24,6 +24,9 @@ UNITS = [{
     'description': 'The final price is calculated based on the number of calls made to the API'
 }]
 
+# Authorization can be done using the FIWARE IdM or directly with API Umbrella roles
+AUTH_METHOD = 'idm'
+
 UMBRELLA_KEY = 'LWmOjZMTuaZp5BwNI3GsNsdsR6Sq3YqBHUcUj9Fw'
 UMBRELLA_ADMIN_TOKEN = 'JDLlA0iRw5lYbT1ucKcP3AwT6eGtbsBgqoUf2RyV'
 

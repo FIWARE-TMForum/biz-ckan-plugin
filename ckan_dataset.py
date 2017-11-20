@@ -20,9 +20,7 @@
 
 from __future__ import unicode_literals
 
-import json
 import requests
-import urllib
 from datetime import datetime, timedelta
 from urlparse import urlparse, urljoin
 
@@ -33,7 +31,7 @@ from wstore.asset_manager.resource_plugins.plugin import Plugin
 from wstore.asset_manager.resource_plugins.plugin_error import PluginError
 from wstore.models import User
 
-from settings import UNITS
+from settings import UNITS, AUTH_METHOD
 from umbrella_client import UmbrellaClient
 from keystone_client import KeystoneClient
 
@@ -43,6 +41,10 @@ class CKANDataset(Plugin):
     def __init__(self, plugin_model):
         super(CKANDataset, self).__init__(plugin_model)
         self._units = UNITS
+        self._clients = {
+            'idm': self._get_keystone_client,
+            'umbrella': self._get_umbrella_client
+        }
 
     def get_request(self, *args, **kwargs):
         try:
@@ -120,11 +122,21 @@ class CKANDataset(Plugin):
     def on_pre_product_spec_validation(self, provider, asset_t, media_type, url):
         self.check_user_is_owner(provider, url)
 
-    def _get_api_client(self, url):
+    def _get_umbrella_client(self, url):
         parsed_url = urlparse(url)
         server = '{}://{}'.format(parsed_url.scheme, parsed_url.netloc)
 
         return UmbrellaClient(server)
+
+    def _get_keystone_client(self, url):
+        keystone_client = KeystoneClient()
+        keystone_client.set_resource_url(url)
+
+        return keystone_client
+
+    def _get_api_client(self, url):
+        # Return API Client (Umbrella or keystone) depending on the authorization mechanism
+        return self._clients[AUTH_METHOD](url)
 
     def _check_dataset_api(self, url, name):
         parsed_url = urlparse(url)
@@ -142,6 +154,7 @@ class CKANDataset(Plugin):
             # If the CKAN resource is a URL, save it in order to enable activation and accounting
             if 'url' in resource and len(resource['url']) > 0:
 
+                # Validate that the service exists and is secured with API Umbrella
                 self._check_dataset_api(resource['url'], resource['name'])
 
                 if 'resources' not in asset.meta_info:
@@ -201,11 +214,8 @@ class CKANDataset(Plugin):
         # Activate API resources
         if 'resources' in asset.meta_info:
             for resource in asset.meta_info['resources']:
-                keystone_client = KeystoneClient()
-                keystone_client.grant_permission(order.customer, resource, asset.meta_info['role'])
-
                 client = self._get_api_client(resource)
-                client.update_user_role(order.customer.email, asset.meta_info['role'])
+                client.grant_permission(order.customer, asset.meta_info['role'])
 
         # Activate CKAN dataset
         self._manage_notification('/api/action/package_acquired', asset, order)
@@ -214,11 +224,8 @@ class CKANDataset(Plugin):
         # Suspend API Resources
         if 'resources' in asset.meta_info:
             for resource in asset.meta_info['resources']:
-                keystone_client = KeystoneClient()
-                keystone_client.revoke_permission(order.customer, resource, asset.meta_info['role'])
-
                 client = self._get_api_client(resource)
-                client.revoke_user_role(order.customer.email, asset.meta_info['role'])
+                client.revoke_permission(order.customer, asset.meta_info['role'])
 
         # Suspend CKAN dataset
         self._manage_notification('/api/action/revoke_access', asset, order)
@@ -253,7 +260,8 @@ class CKANDataset(Plugin):
 
                 # Check the accumulated usage for all the resources of the dataset
                 for resource in asset.meta_info['resources']:
-                    client = self._get_api_client(resource)
+                    # Accounting is always done by Umbrella no mather who validates permissions
+                    client = self._get_umbrella_client(resource)
                     accounting.extend(client.get_drilldown_by_service(order.customer.email, resource, start_at, end_at))
 
         return accounting, last_usage

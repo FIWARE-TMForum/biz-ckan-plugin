@@ -30,6 +30,7 @@ class KeystoneClient(object):
 
     def __init__(self):
         self._login()
+        self._url = ''
 
     def _login(self):
         body = {
@@ -41,7 +42,7 @@ class KeystoneClient(object):
                     "password": {
                         "user": {
                             "name": KEYSTONE_USER,
-                            "domain": { "name": "Default" },
+                            "domain": {"name": "Default"},
                             "password": KEYSTONE_PASSWORD
                         }
                     }
@@ -55,7 +56,7 @@ class KeystoneClient(object):
         response.raise_for_status()
         self._auth_token = response.headers['x-subject-token']
 
-    def _get_role_assign_url(self, url, role_name, user):
+    def _get_role_assign_url(self, role_name, user):
         # Get available apps
         apps_url = KEYSTONE_HOST + '/v3/OS-OAUTH2/consumers'
         resp = requests.get(apps_url, headers={
@@ -65,7 +66,7 @@ class KeystoneClient(object):
         # Get role id
         resp.raise_for_status()
         apps = resp.json()
-        parsed_url = urlparse(url)
+        parsed_url = urlparse(self._url)
 
         app_id = ''
         for app in apps['consumers']:
@@ -97,17 +98,23 @@ class KeystoneClient(object):
 
         return KEYSTONE_HOST + '/v3/OS-ROLES/users/' + user.username + '/applications/' + app_id + '/roles/' + role_id
 
-    def grant_permission(self, user, url, role):
+    def set_resource_url(self, url):
+        self._url = url
+
+    def check_role(self, role):
+        pass
+
+    def grant_permission(self, user, role):
         # Get ids
-        assign_url = self._get_role_assign_url(url, role, user)
+        assign_url = self._get_role_assign_url(role, user)
         resp = requests.put(assign_url, headers={
             'X-Auth-Token': self._auth_token
         })
 
         resp.raise_for_status()
 
-    def revoke_permission(self, user, url, role):
-        assign_url = self._get_role_assign_url(url, role, user)
+    def revoke_permission(self, user, role):
+        assign_url = self._get_role_assign_url(role, user)
         resp = requests.delete(assign_url, headers={
             'X-Auth-Token': self._auth_token
         })
