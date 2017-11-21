@@ -56,7 +56,7 @@ class KeystoneClient(object):
         response.raise_for_status()
         self._auth_token = response.headers['x-subject-token']
 
-    def _get_role_assign_url(self, role_name, user):
+    def _get_app_id(self):
         # Get available apps
         apps_url = KEYSTONE_HOST + '/v3/OS-OAUTH2/consumers'
         resp = requests.get(apps_url, headers={
@@ -68,7 +68,6 @@ class KeystoneClient(object):
         apps = resp.json()
         parsed_url = urlparse(self._url)
 
-        app_id = ''
         for app in apps['consumers']:
             if 'url' in app['extra']:
                 app_url = urlparse(app['extra']['url'])
@@ -78,6 +77,9 @@ class KeystoneClient(object):
         else:
             raise Exception('The provided app is not registered in keystone')
 
+        return app_id
+
+    def _get_role_id(self, app_id, role_name):
         # Get available roles
         roles_url = KEYSTONE_HOST + '/v3/OS-ROLES/roles'
         resp = requests.get(roles_url, headers={
@@ -88,7 +90,6 @@ class KeystoneClient(object):
         resp.raise_for_status()
         roles = resp.json()
 
-        role_id = ''
         for role in roles['roles']:
             if role['application_id'] == app_id and role['name'].lower() == role_name.lower():
                 role_id = role['id']
@@ -96,13 +97,18 @@ class KeystoneClient(object):
         else:
             raise Exception('The provided role is not registered in keystone')
 
+        return role_id
+
+    def _get_role_assign_url(self, role_name, user):
+        app_id = self._get_app_id()
+        role_id = self._get_role_id(app_id, role_name)
         return KEYSTONE_HOST + '/v3/OS-ROLES/users/' + user.username + '/applications/' + app_id + '/roles/' + role_id
 
     def set_resource_url(self, url):
         self._url = url
 
     def check_role(self, role):
-        pass
+        self._get_role_id(self._get_app_id(), role)
 
     def grant_permission(self, user, role):
         # Get ids
