@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2017 CoNWeT Lab., Universidad Politécnica de Madrid
+# Copyright (c) 2017 - 2018 CoNWeT Lab., Universidad Politécnica de Madrid
 
 # This file is part of BAE CKAN plugin.
 
@@ -27,9 +27,13 @@ UNITS = [{
 # Authorization can be done using the FIWARE IdM or directly with API Umbrella roles
 AUTH_METHOD = 'idm'
 
+UMBRELLA_SERVER = 'https://umbrella.docker:8443'
 UMBRELLA_KEY = 'LWmOjZMTuaZp5BwNI3GsNsdsR6Sq3YqBHUcUj9Fw'
 UMBRELLA_ADMIN_TOKEN = 'JDLlA0iRw5lYbT1ucKcP3AwT6eGtbsBgqoUf2RyV'
 
 KEYSTONE_USER = 'idm'
 KEYSTONE_PASSWORD = 'idm'
 KEYSTONE_HOST = ''
+
+# Supported options are bearer for Authorization: Bearer TOKEN, or x-auth for X-Auth-Token: TOKEN
+CKAN_TOKEN_TYPE = 'bearer'

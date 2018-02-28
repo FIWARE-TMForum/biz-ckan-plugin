@@ -56,29 +56,6 @@ class KeystoneClient(object):
         response.raise_for_status()
         self._auth_token = response.headers['x-subject-token']
 
-    def _get_app_id(self):
-        # Get available apps
-        apps_url = KEYSTONE_HOST + '/v3/OS-OAUTH2/consumers'
-        resp = requests.get(apps_url, headers={
-            'X-Auth-Token': self._auth_token
-        })
-
-        # Get role id
-        resp.raise_for_status()
-        apps = resp.json()
-        parsed_url = urlparse(self._url)
-
-        for app in apps['consumers']:
-            if 'url' in app['extra']:
-                app_url = urlparse(app['extra']['url'])
-                if app_url.netloc == parsed_url.netloc:
-                    app_id = app['id']
-                    break
-        else:
-            raise Exception('The provided app is not registered in keystone')
-
-        return app_id
-
     def _get_role_id(self, app_id, role_name):
         # Get available roles
         roles_url = KEYSTONE_HOST + '/v3/OS-ROLES/roles'
@@ -99,28 +76,43 @@ class KeystoneClient(object):
 
         return role_id
 
-    def _get_role_assign_url(self, role_name, user):
-        app_id = self._get_app_id()
+    def _get_role_assign_url(self, app_id, role_name, user):
         role_id = self._get_role_id(app_id, role_name)
         return KEYSTONE_HOST + '/v3/OS-ROLES/users/' + user.username + '/applications/' + app_id + '/roles/' + role_id
 
     def set_resource_url(self, url):
         self._url = url
 
-    def check_role(self, role):
-        self._get_role_id(self._get_app_id(), role)
+    def check_role(self, app_id, role):
+        self._get_role_id(app_id, role)
 
-    def grant_permission(self, user, role):
+    def check_ownership(self, app_id, provider):
+        assingments_url = KEYSTONE_HOST + '/v3/OS-ROLES/users/role_assignments'
+
+        resp = requests.get(assingments_url, headers={
+            'X-Auth-Token': self._auth_token
+        })
+
+        resp.raise_for_status()
+        assingments = resp.json()
+
+        for assingment in assingments['role_assignments']:
+            if assingment['application_id'] == app_id and assingment['user_id'] == provider and assingment['role_id'] == 'provider':
+                break
+        else:
+            raise PermissionDenied('You are not the owner of the specified IDM application')
+
+    def grant_permission(self, app_id, user, role):
         # Get ids
-        assign_url = self._get_role_assign_url(role, user)
+        assign_url = self._get_role_assign_url(app_id, role, user)
         resp = requests.put(assign_url, headers={
             'X-Auth-Token': self._auth_token
         })
 
         resp.raise_for_status()
 
-    def revoke_permission(self, user, role):
-        assign_url = self._get_role_assign_url(role, user)
+    def revoke_permission(self, app_id, user, role):
+        assign_url = self._get_role_assign_url(app_id, role, user)
         resp = requests.delete(assign_url, headers={
             'X-Auth-Token': self._auth_token
         })

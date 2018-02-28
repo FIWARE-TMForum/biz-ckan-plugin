@@ -25,13 +25,13 @@ from datetime import datetime, timedelta
 from urlparse import urlparse, urljoin
 
 from django.core.exceptions import PermissionDenied
-from django.conf import settings
+from django.conf import settings as django_settings
 
 from wstore.asset_manager.resource_plugins.plugin import Plugin
 from wstore.asset_manager.resource_plugins.plugin_error import PluginError
 from wstore.models import User
 
-from settings import UNITS, AUTH_METHOD
+from settings import UNITS, AUTH_METHOD, CKAN_TOKEN_TYPE
 from umbrella_client import UmbrellaClient
 from keystone_client import KeystoneClient
 
@@ -70,12 +70,25 @@ class CKANDataset(Plugin):
 
         return ckan_server, dataset_id
 
+    def _get_token_headers(self, user_token):
+        token_headers = {
+            'bearer': 'Authorization',
+            'x-auth': 'X-Auth-Token'
+        }
+
+        token_header = token_headers[CKAN_TOKEN_TYPE]
+        token_value = user_token if CKAN_TOKEN_TYPE == 'x-auth' else 'Bearer {}'.format(user_token)
+
+        return {
+            token_header: token_value
+        }
+
     def _get_dataset_info(self, url, token):
         # Get CKAN server URL
         ckan_server, dataset_id = self.get_ckan_info(url)
 
         # Create headers for the requests
-        headers = {'X-Auth-token': token}
+        headers = self._get_token_headers(token)
 
         # Get dataset metainfo
         meta_url = urljoin(ckan_server, 'api/action/package_show?id=' + dataset_id)
@@ -101,8 +114,9 @@ class CKANDataset(Plugin):
         # Get user info
         # Get CKAN server URL
         ckan_server, dataset_id = self.get_ckan_info(url)
+
         # Create headers for the requests
-        headers = {'X-Auth-token': user.userprofile.access_token}
+        headers = self._get_token_headers(user.userprofile.access_token)
 
         user_url = urljoin(ckan_server, 'api/action/user_show?id=' + user_id)
         user_info_res = self.get_request(user_url, headers=headers)
@@ -138,12 +152,30 @@ class CKANDataset(Plugin):
         # Return API Client (Umbrella or keystone) depending on the authorization mechanism
         return self._clients[AUTH_METHOD](url)
 
-    def _check_dataset_api(self, url, name):
+    def _check_role(self, app_id, role, url):
+        # This plugin uses API Umbrella as PDP, so the role must exists both, in the IDM and in API Umbrella
+        umbrella_client = self._get_umbrella_client(url)
+        umbrella_client.check_role(role)
+
+        keystone_client = self._get_keystone_client(url)
+        keystone_client.check_role(app_id, role)
+
+    def _check_dataset_api(self, url):
         parsed_url = urlparse(url)
         server = '{}://{}'.format(parsed_url.scheme, parsed_url.netloc)
 
         umbrella_client = UmbrellaClient(server)
-        umbrella_client.validate_service(parsed_url.path, name)
+        app_id = umbrella_client.validate_service(parsed_url.path)
+
+        if app_id is None:
+            # Raise an error since this plugin only supports FIWARE IDM role authorization
+            raise PluginError('The dataset resource {} is not configured to support idm authentication'.format(url))
+
+        # Check if the provided app_id is valid for the included keystone instance
+        keystone_client = self._get_keystone_client(url)
+        keystone_client.check_ownership(app_id, provider.name)
+
+        return app_id
 
     def on_post_product_spec_validation(self, provider, asset):
         # Read CKAN dataset resources in order to determine the broker URLs
@@ -155,18 +187,19 @@ class CKANDataset(Plugin):
             if 'url' in resource and len(resource['url']) > 0:
 
                 # Validate that the service exists and is secured with API Umbrella
-                self._check_dataset_api(resource['url'], resource['name'])
+                app_id = self._check_dataset_api(resource['url'])
 
                 if 'resources' not in asset.meta_info:
                     asset.meta_info['resources'] = []
 
-                asset.meta_info['resources'].append(resource['url'])
+                asset.meta_info['resources'].append({
+                    'url': resource['url'],
+                    'app_id': app_id
+                })
 
                 # Check that the provided role is valid for the given API service
-                client = self._get_api_client(resource['url'])
-                client.check_role(asset.meta_info['role'])
+                self._check_role(app_id, asset.meta_info['role'], resource['url'])
 
-        # TODO: Validate that the user is also the owner of the API
         asset.save()
 
     def on_post_product_offering_validation(self, asset, product_offering):
@@ -206,16 +239,27 @@ class CKANDataset(Plugin):
             notification_url,
             json=data,
             headers=headers,
-            cert=(settings.NOTIF_CERT_FILE, settings.NOTIF_CERT_KEY_FILE)
+            cert=(django_settings.NOTIF_CERT_FILE, django_settings.NOTIF_CERT_KEY_FILE)
         )
         response.raise_for_status()
+
+    def _manage_permissions(self, customer, app_id, role, url, action):
+        umbrella_client = self._get_umbrella_client(url)
+        keystone_client = self._get_keystone_client(url)
+
+        if action == 'grant':
+            umbrella_client.grant_permission(customer, role)
+            keystone_client.grant_permission(app_id, customer, role)
+        elif action == 'revoke:
+            umbrella_client.revoke_permission(customer, role)
+            keystone_client.revoke_permission(app_id, customer, role)
 
     def on_product_acquisition(self, asset, contract, order):
         # Activate API resources
         if 'resources' in asset.meta_info:
             for resource in asset.meta_info['resources']:
-                client = self._get_api_client(resource)
-                client.grant_permission(order.customer, asset.meta_info['role'])
+                self._manage_permissions(
+                    order.customer, resource['app_id'], asset.meta_info['role'], resource['url'], 'grant')
 
         # Activate CKAN dataset
         self._manage_notification('/api/action/package_acquired', asset, order)
@@ -224,8 +268,8 @@ class CKANDataset(Plugin):
         # Suspend API Resources
         if 'resources' in asset.meta_info:
             for resource in asset.meta_info['resources']:
-                client = self._get_api_client(resource)
-                client.revoke_permission(order.customer, asset.meta_info['role'])
+                self._manage_permissions(
+                    order.customer, resource['app_id'], asset.meta_info['role'], resource['url'], 'revoke')
 
         # Suspend CKAN dataset
         self._manage_notification('/api/action/revoke_access', asset, order)
@@ -253,15 +297,13 @@ class CKANDataset(Plugin):
                 start_at = unicode((datetime.utcnow() - timedelta(days=31)).isoformat()).replace(' ', 'T') + 'Z'
 
             # Retrieve pending usage
-            # TODO: Support more accounting units
-            if unit.lower() == 'api call':
-                last_usage = datetime.utcnow()
-                end_at = unicode(last_usage.isoformat()).replace(' ', 'T') + 'Z'
+            last_usage = datetime.utcnow()
+            end_at = unicode(last_usage.isoformat()).replace(' ', 'T') + 'Z'
 
-                # Check the accumulated usage for all the resources of the dataset
-                for resource in asset.meta_info['resources']:
-                    # Accounting is always done by Umbrella no mather who validates permissions
-                    client = self._get_umbrella_client(resource)
-                    accounting.extend(client.get_drilldown_by_service(order.customer.email, resource, start_at, end_at))
+            # Check the accumulated usage for all the resources of the dataset
+            for resource in asset.meta_info['resources']:
+                # Accounting is always done by Umbrella no mather who validates permissions
+                client = self._get_umbrella_client(resource)
+                accounting.extend(client.get_drilldown_by_service(order.customer.email, resource, start_at, end_at, unit.lower()))
 
         return accounting, last_usage
