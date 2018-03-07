@@ -250,7 +250,7 @@ class CKANDataset(Plugin):
         if action == 'grant':
             umbrella_client.grant_permission(customer, role)
             keystone_client.grant_permission(app_id, customer, role)
-        elif action == 'revoke:
+        elif action == 'revoke':
             umbrella_client.revoke_permission(customer, role)
             keystone_client.revoke_permission(app_id, customer, role)
 
