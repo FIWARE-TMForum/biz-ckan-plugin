@@ -23,6 +23,8 @@ from __future__ import unicode_literals
 import requests
 from urlparse import urlparse
 
+from django.core.exceptions import PermissionDenied
+
 from settings import KEYSTONE_HOST, KEYSTONE_PASSWORD, KEYSTONE_USER
 
 
