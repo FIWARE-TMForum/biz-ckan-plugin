@@ -160,7 +160,7 @@ class CKANDataset(Plugin):
         keystone_client = self._get_keystone_client(url)
         keystone_client.check_role(app_id, role)
 
-    def _check_dataset_api(self, url):
+    def _check_dataset_api(self, url, provider_name):
         parsed_url = urlparse(url)
         server = '{}://{}'.format(parsed_url.scheme, parsed_url.netloc)
 
@@ -173,7 +173,7 @@ class CKANDataset(Plugin):
 
         # Check if the provided app_id is valid for the included keystone instance
         keystone_client = self._get_keystone_client(url)
-        keystone_client.check_ownership(app_id, provider.name)
+        keystone_client.check_ownership(app_id, provider_name)
 
         return app_id
 
@@ -187,7 +187,7 @@ class CKANDataset(Plugin):
             if 'url' in resource and len(resource['url']) > 0:
 
                 # Validate that the service exists and is secured with API Umbrella
-                app_id = self._check_dataset_api(resource['url'])
+                app_id = self._check_dataset_api(resource['url'], provider.name)
 
                 if 'resources' not in asset.meta_info:
                     asset.meta_info['resources'] = []
