@@ -23,7 +23,7 @@ import json
 import requests
 import urllib
 from datetime import datetime
-from urlparse import urljoin, urlparse
+from urlparse import urljoin, urlparse, parse_qs
 
 from django.core.exceptions import PermissionDenied
 
@@ -36,6 +36,9 @@ class UmbrellaClient(object):
 
     def __init__(self, server):
         self._server = server
+        self._accounting_processor = {
+            'api call': self._process_call_accounting
+        }
 
     def _make_request(self, path, method, **kwargs):
         url = urljoin(self._server, path)
@@ -64,6 +67,14 @@ class UmbrellaClient(object):
             'X-Api-Key': UMBRELLA_KEY,
             'X-Admin-Auth-Token': UMBRELLA_ADMIN_TOKEN
         }, verify=False)
+
+    def _post_request(self, path, body):
+        resp = self._make_request(path, requests.post, data=body, headers={
+            'X-Api-Key': UMBRELLA_KEY,
+            'X-Admin-Auth-Token': UMBRELLA_ADMIN_TOKEN
+        }, verify=False)
+
+        return resp.json()
 
     def _paginate_data(self, url, err_msg, page_processor):
         page_len = 100
@@ -233,7 +244,7 @@ class UmbrellaClient(object):
                 'date': unicode(current_date.isoformat()) + 'T00:00:00Z'
             })
 
-    def _process_call_accounting(self, params, parsed_url, extra_qs):
+    def _process_call_accounting(self, params, parsed_url):
         def list_equal_elems(list1, list2):
             intersect = set(list2).intersection(list1)
             return len(list1) == len(list2) == len(intersect)
@@ -284,4 +295,4 @@ class UmbrellaClient(object):
             'query': json.dumps(query)
         }
 
-        return self._accounting_processor[unit](params, parsed_url, extra_qs)
+        return self._accounting_processor[unit](params, parsed_url)

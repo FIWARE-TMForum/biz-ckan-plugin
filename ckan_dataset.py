@@ -303,7 +303,7 @@ class CKANDataset(Plugin):
             # Check the accumulated usage for all the resources of the dataset
             for resource in asset.meta_info['resources']:
                 # Accounting is always done by Umbrella no mather who validates permissions
-                client = self._get_umbrella_client(resource)
-                accounting.extend(client.get_drilldown_by_service(order.customer.email, resource, start_at, end_at, unit.lower()))
+                client = self._get_umbrella_client(resource['url'])
+                accounting.extend(client.get_drilldown_by_service(order.customer.email, resource['url'], start_at, end_at, unit.lower()))
 
         return accounting, last_usage
