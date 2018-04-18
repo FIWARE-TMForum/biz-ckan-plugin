@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2017 CoNWeT Lab., Universidad Politécnica de Madrid
+# Copyright (c) 2017 - 2018 CoNWeT Lab., Universidad Politécnica de Madrid
 
 # This file is part of BAE CKAN plugin.
 
@@ -112,10 +112,10 @@ class UmbrellaClient(object):
             raise PluginError(err_msg)
 
         # Make paginated requests to API umbrella looking for the provided paths
-        url = '/api-umbrella/v1/apis.json?search[value]={}&search[regex]=false'.format(paths[0])
+        url = '/api-umbrella/v1/apis.json'
         def page_processor(api):
             front_path = [p for p in api['frontend_prefixes'].split('/') if p != '']
-            return len(front_path) <= len(paths) and front_path == paths[:len(front_path)]
+            return len(front_path) == 0 or (len(front_path) <= len(paths) and front_path == paths[:len(front_path)])
 
         matching_elem = self._paginate_data(url, err_msg, page_processor)
 
@@ -255,6 +255,9 @@ class UmbrellaClient(object):
             # Filter query strings during aggregation to enable changing the order and
             # included extra params when enabled
             if len(parsed_url.query):
+                if 'request_url_query' not in elem or elem['request_url_query'] is None or not len(elem['request_url_query']):
+                    return 0
+
                 parsed_elem_qs = parse_qs(elem['request_url_query'])
                 url_qs = parse_qs(parsed_url.query)
 
