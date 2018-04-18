@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015 - 2017 CoNWeT Lab., Universidad Politécnica de Madrid
+# Copyright (c) 2015 - 2018 CoNWeT Lab., Universidad Politécnica de Madrid
 
 # This file is part of BAE CKAN plugin.
 
@@ -92,7 +92,7 @@ class CKANDataset(Plugin):
 
         # Get dataset metainfo
         meta_url = urljoin(ckan_server, 'api/action/package_show?id=' + dataset_id)
-        meta_info_res = self.get_request(meta_url, headers=headers)
+        meta_info_res = self.get_request(meta_url, headers=headers, verify=django_settings.VERIFY_REQUESTS)
 
         if meta_info_res.status_code != 200:
             error_msg = 'The dataset provided dataset does not exist' if meta_info_res.status_code == 404 else \
@@ -119,7 +119,7 @@ class CKANDataset(Plugin):
         headers = self._get_token_headers(user.userprofile.access_token)
 
         user_url = urljoin(ckan_server, 'api/action/user_show?id=' + user_id)
-        user_info_res = self.get_request(user_url, headers=headers)
+        user_info_res = self.get_request(user_url, headers=headers, verify=django_settings.VERIFY_REQUESTS)
 
         if user_info_res.status_code != 200:
             # When the current user cannot access the profile of the owner of dataset,
@@ -239,6 +239,7 @@ class CKANDataset(Plugin):
             notification_url,
             json=data,
             headers=headers,
+            verify=django_settings.VERIFY_REQUESTS,
             cert=(django_settings.NOTIF_CERT_FILE, django_settings.NOTIF_CERT_KEY_FILE)
         )
         response.raise_for_status()

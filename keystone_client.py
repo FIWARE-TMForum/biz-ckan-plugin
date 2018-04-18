@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2017 CoNWeT Lab., Universidad Politécnica de Madrid
+# Copyright (c) 2017 - 2018 CoNWeT Lab., Universidad Politécnica de Madrid
 
 # This file is part of BAE CKAN plugin.
 
@@ -24,6 +24,7 @@ import requests
 from urlparse import urlparse
 
 from django.core.exceptions import PermissionDenied
+from django.conf import settings as django_settings
 
 from settings import KEYSTONE_HOST, KEYSTONE_PASSWORD, KEYSTONE_USER
 
@@ -53,7 +54,7 @@ class KeystoneClient(object):
         }
 
         url = KEYSTONE_HOST + '/v3/auth/tokens'
-        response = requests.post(url, json=body)
+        response = requests.post(url, json=body, verify=django_settings.VERIFY_REQUESTS)
 
         response.raise_for_status()
         self._auth_token = response.headers['x-subject-token']
@@ -63,7 +64,7 @@ class KeystoneClient(object):
         roles_url = KEYSTONE_HOST + '/v3/OS-ROLES/roles'
         resp = requests.get(roles_url, headers={
             'X-Auth-Token': self._auth_token
-        })
+        }, verify=django_settings.VERIFY_REQUESTS)
 
         # Get role id
         resp.raise_for_status()
@@ -93,7 +94,7 @@ class KeystoneClient(object):
 
         resp = requests.get(assingments_url, headers={
             'X-Auth-Token': self._auth_token
-        })
+        }, verify=django_settings.VERIFY_REQUESTS)
 
         resp.raise_for_status()
         assingments = resp.json()
@@ -109,7 +110,7 @@ class KeystoneClient(object):
         assign_url = self._get_role_assign_url(app_id, role, user)
         resp = requests.put(assign_url, headers={
             'X-Auth-Token': self._auth_token
-        })
+        }, verify=django_settings.VERIFY_REQUESTS)
 
         resp.raise_for_status()
 
@@ -117,6 +118,6 @@ class KeystoneClient(object):
         assign_url = self._get_role_assign_url(app_id, role, user)
         resp = requests.delete(assign_url, headers={
             'X-Auth-Token': self._auth_token
-        })
+        }, verify=django_settings.VERIFY_REQUESTS)
 
         resp.raise_for_status()
