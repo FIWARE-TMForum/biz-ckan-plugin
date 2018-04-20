@@ -26,7 +26,7 @@ from urlparse import urlparse
 from django.core.exceptions import PermissionDenied
 from django.conf import settings as django_settings
 
-from settings import KEYSTONE_HOST, KEYSTONE_PASSWORD, KEYSTONE_USER
+from settings import KEYSTONE_HOST, KEYSTONE_PASSWORD, KEYSTONE_USER, IS_LEGACY_IDM
 
 
 class KeystoneClient(object):
@@ -36,22 +36,28 @@ class KeystoneClient(object):
         self._url = ''
 
     def _login(self):
-        body = {
-            "auth": {
-                "identity": {
-                    "methods": [
-                        "password"
-                    ],
-                    "password": {
-                        "user": {
-                            "name": KEYSTONE_USER,
-                            "domain": {"name": "Default"},
+        if IS_LEGACY_IDM:
+            body = {
+                "auth": {
+                    "identity": {
+                        "methods": [
+                            "password"
+                        ],
+                        "password": {
+                            "user": {
+                                "name": KEYSTONE_USER,
+                                "domain": {"name": "Default"},
                             "password": KEYSTONE_PASSWORD
+                            }
                         }
                     }
                 }
             }
-        }
+        else:
+            body = {
+                "name": KEYSTONE_USER,
+                "password": KEYSTONE_PASSWORD
+            }
 
         url = KEYSTONE_HOST + '/v3/auth/tokens'
         response = requests.post(url, json=body, verify=django_settings.VERIFY_REQUESTS)
@@ -61,7 +67,9 @@ class KeystoneClient(object):
 
     def _get_role_id(self, app_id, role_name):
         # Get available roles
-        roles_url = KEYSTONE_HOST + '/v3/OS-ROLES/roles'
+        path = '/v3/OS-ROLES/roles' if IS_LEGACY_IDM else '/v1/applications/{}/roles'.format(app_id)
+        roles_url = KEYSTONE_HOST + path
+
         resp = requests.get(roles_url, headers={
             'X-Auth-Token': self._auth_token
         }, verify=django_settings.VERIFY_REQUESTS)
@@ -71,7 +79,7 @@ class KeystoneClient(object):
         roles = resp.json()
 
         for role in roles['roles']:
-            if role['application_id'] == app_id and role['name'].lower() == role_name.lower():
+            if role['name'].lower() == role_name.lower() and (not IS_LEGACY_IDM or (IS_LEGACY_IDM and role['application_id'] == app_id)):
                 role_id = role['id']
                 break
         else:
@@ -81,7 +89,8 @@ class KeystoneClient(object):
 
     def _get_role_assign_url(self, app_id, role_name, user):
         role_id = self._get_role_id(app_id, role_name)
-        return KEYSTONE_HOST + '/v3/OS-ROLES/users/' + user.username + '/applications/' + app_id + '/roles/' + role_id
+        path = '/v3/OS-ROLES/users/{}/applications/{}/roles'.format(user.username, app_id, role_id) if IS_LEGACY_IDM else '/v1/applications/{}/users/{}/roles/{}'.format(app_id, user.username, role_id)
+        return KEYSTONE_HOST + path
 
     def set_resource_url(self, url):
         self._url = url
@@ -90,7 +99,22 @@ class KeystoneClient(object):
         self._get_role_id(app_id, role)
 
     def check_ownership(self, app_id, provider):
-        assingments_url = KEYSTONE_HOST + '/v3/OS-ROLES/users/role_assignments'
+        def validate(assingment):
+            return assingment['role_id'] == 'provider'
+
+        def validate_legacy(assingment):
+            return assingment['application_id'] == app_id and assingment['user_id'] == provider and assingment['role_id'] == 'provider'
+
+        if IS_LEGACY_IDM:
+            path = '/v3/OS-ROLES/users/role_assignments'
+            role_field = 'role_assignments'
+            validator = validate_legacy
+        else:
+            path = '/v1/applications/{}/users/{}/roles'.format(app_id, provider)
+            role_field = 'role_user_assignments'
+            validator = validate
+
+        assingments_url = KEYSTONE_HOST + path
 
         resp = requests.get(assingments_url, headers={
             'X-Auth-Token': self._auth_token
@@ -99,8 +123,8 @@ class KeystoneClient(object):
         resp.raise_for_status()
         assingments = resp.json()
 
-        for assingment in assingments['role_assignments']:
-            if assingment['application_id'] == app_id and assingment['user_id'] == provider and assingment['role_id'] == 'provider':
+        for assingment in assingments[role_field]:
+            if validator(assingment):
                 break
         else:
             raise PermissionDenied('You are not the owner of the specified IDM application')
@@ -108,8 +132,11 @@ class KeystoneClient(object):
     def grant_permission(self, app_id, user, role):
         # Get ids
         assign_url = self._get_role_assign_url(app_id, role, user)
-        resp = requests.put(assign_url, headers={
-            'X-Auth-Token': self._auth_token
+        method = requests.put if IS_LEGACY_IDM else requests.post
+
+        resp = method(assign_url, headers={
+            'X-Auth-Token': self._auth_token,
+            'Content-Type': 'application/json'
         }, verify=django_settings.VERIFY_REQUESTS)
 
         resp.raise_for_status()
@@ -117,7 +144,8 @@ class KeystoneClient(object):
     def revoke_permission(self, app_id, user, role):
         assign_url = self._get_role_assign_url(app_id, role, user)
         resp = requests.delete(assign_url, headers={
-            'X-Auth-Token': self._auth_token
+            'X-Auth-Token': self._auth_token,
+            'Content-Type': 'application/json'
         }, verify=django_settings.VERIFY_REQUESTS)
 
         resp.raise_for_status()

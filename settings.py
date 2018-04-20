@@ -34,6 +34,7 @@ UMBRELLA_ADMIN_TOKEN = 'JDLlA0iRw5lYbT1ucKcP3AwT6eGtbsBgqoUf2RyV'
 KEYSTONE_USER = 'idm'
 KEYSTONE_PASSWORD = 'idm'
 KEYSTONE_HOST = ''
+IS_LEGACY_IDM = False
 
 # Supported options are bearer for Authorization: Bearer TOKEN, or x-auth for X-Auth-Token: TOKEN
 CKAN_TOKEN_TYPE = 'bearer'
