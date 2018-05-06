@@ -89,7 +89,7 @@ class KeystoneClient(object):
 
     def _get_role_assign_url(self, app_id, role_name, user):
         role_id = self._get_role_id(app_id, role_name)
-        path = '/v3/OS-ROLES/users/{}/applications/{}/roles'.format(user.username, app_id, role_id) if IS_LEGACY_IDM else '/v1/applications/{}/users/{}/roles/{}'.format(app_id, user.username, role_id)
+        path = '/v3/OS-ROLES/users/{}/applications/{}/roles/{}'.format(user.username, app_id, role_id) if IS_LEGACY_IDM else '/v1/applications/{}/users/{}/roles/{}'.format(app_id, user.username, role_id)
         return KEYSTONE_HOST + path
 
     def set_resource_url(self, url):
