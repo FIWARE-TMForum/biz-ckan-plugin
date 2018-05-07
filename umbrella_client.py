@@ -158,23 +158,6 @@ class UmbrellaClient(object):
 
         return new_roles
 
-    def grant_permission(self, user, role):
-        self.check_role(role)
-        user_model = self._get_user_model(user.email)
-
-        # Update user roles
-        new_roles = self._filter_roles(user_model, role).append(role)
-
-        user_model['user']['roles'] = new_roles
-
-        self._put_request('/api-umbrella/v1/users/{}'.format(user_model['user']['id']), user_model)
-
-    def revoke_permission(self, user, role):
-        self.check_role(role)
-        user_model = self._get_user_model(user.email)
-        user_model['user']['roles'] = self._filter_roles(user_model, role)
-        self._put_request('/api-umbrella/v1/users/{}'.format(user_model['user']['id']), user_model)
-
     def _get_rule(self, field, value):
         return {
             'id': field,

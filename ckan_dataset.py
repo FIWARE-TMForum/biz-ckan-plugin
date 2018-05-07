@@ -249,10 +249,8 @@ class CKANDataset(Plugin):
         keystone_client = self._get_keystone_client(url)
 
         if action == 'grant':
-            umbrella_client.grant_permission(customer, role)
             keystone_client.grant_permission(app_id, customer, role)
         elif action == 'revoke':
-            umbrella_client.revoke_permission(customer, role)
             keystone_client.revoke_permission(app_id, customer, role)
 
     def on_product_acquisition(self, asset, contract, order):
