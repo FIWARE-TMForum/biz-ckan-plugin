@@ -19,13 +19,12 @@
 
 from __future__ import unicode_literals
 
+from os import environ
+
 UNITS = [{
     'name': 'Api call',
     'description': 'The final price is calculated based on the number of calls made to the API'
 }]
-
-# Authorization can be done using the FIWARE IdM or directly with API Umbrella roles
-AUTH_METHOD = 'idm'
 
 UMBRELLA_SERVER = 'https://umbrella.docker:8443'
 UMBRELLA_KEY = 'LWmOjZMTuaZp5BwNI3GsNsdsR6Sq3YqBHUcUj9Fw'
@@ -38,3 +37,21 @@ IS_LEGACY_IDM = False
 
 # Supported options are bearer for Authorization: Bearer TOKEN, or x-auth for X-Auth-Token: TOKEN
 CKAN_TOKEN_TYPE = 'bearer'
+
+# =====================================================
+# READ environ to check if settings has to be overriden
+
+UMBRELLA_SERVER = environ.get('BAE_ASSET_UMBRELLA_SERVER', UMBRELLA_SERVER)
+UMBRELLA_KEY = environ.get('BAE_ASSET_UMBRELLA_KEY', UMBRELLA_KEY)
+UMBRELLA_ADMIN_TOKEN = environ.get('BAE_ASSET_UMBRELLA_TOKEN', UMBRELLA_ADMIN_TOKEN)
+
+KEYSTONE_USER = environ.get('BAE_ASSET_IDM_USER', KEYSTONE_USER)
+KEYSTONE_PASSWORD = environ.get('BAE_ASSET_IDM_PASSWORD', KEYSTONE_PASSWORD)
+KEYSTONE_HOST = environ.get('BAE_ASSET_IDM_HOST', KEYSTONE_HOST)
+
+is_legacy = environ.get('BAE_ASSET_LEGACY_IDM', None)
+if is_legacy is not None:
+    IS_LEGACY_IDM = is_legacy == "True"
+
+# Supported options are bearer for Authorization: Bearer TOKEN, or x-auth for X-Auth-Token: TOKEN
+CKAN_TOKEN_TYPE = environ.get('BAE_ASSET_TOKEN_TYPE', CKAN_TOKEN_TYPE)

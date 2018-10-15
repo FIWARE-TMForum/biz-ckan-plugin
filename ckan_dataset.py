@@ -31,7 +31,7 @@ from wstore.asset_manager.resource_plugins.plugin import Plugin
 from wstore.asset_manager.resource_plugins.plugin_error import PluginError
 from wstore.models import User
 
-from settings import UNITS, AUTH_METHOD, CKAN_TOKEN_TYPE
+from settings import UNITS, CKAN_TOKEN_TYPE
 from umbrella_client import UmbrellaClient
 from keystone_client import KeystoneClient
 
@@ -147,10 +147,6 @@ class CKANDataset(Plugin):
         keystone_client.set_resource_url(url)
 
         return keystone_client
-
-    def _get_api_client(self, url):
-        # Return API Client (Umbrella or keystone) depending on the authorization mechanism
-        return self._clients[AUTH_METHOD](url)
 
     def _check_role(self, app_id, role, url):
         # This plugin uses API Umbrella as PDP, so the role must exists both, in the IDM and in API Umbrella
