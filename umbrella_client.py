@@ -76,28 +76,40 @@ class UmbrellaClient(object):
 
         return resp.json()
 
-    def _paginate_data(self, url, err_msg, page_processor):
+    def _paginate_data(self, url, err_msg, page_processor, elem_selector=None):
         page_len = 100
         start = 0
         processed = False
         matching_elem = None
+        matching_elems = []
 
         while not processed:
             result = self._get_request(url + '&start={}&length={}'.format(start, page_len))
 
             # There is no remaining elements
             if not len(result['data']):
-                raise PluginError(err_msg)
-            
+                if not len(matching_elems):
+                    raise PluginError(err_msg)
+                else:
+                    processed = True
+
             for elem in result['data']:
-                processed = page_processor(elem)
+                valid = page_processor(elem)
 
                 # The page element has been found
-                if processed:
-                    matching_elem = elem
-                    break
+                if valid:
+                    if elem_selector is None:
+                        matching_elem = elem
+                        processed = True
+                        break
+                    else:
+                        # There might be multiple elements matching
+                        matching_elems.append(elem)
             
             start += page_len
+
+        if elem_selector is not None:
+            matching_elem = elem_selector(matching_elems)
 
         return matching_elem
 
@@ -117,11 +129,21 @@ class UmbrellaClient(object):
             front_path = [p for p in api['frontend_prefixes'].split('/') if p != '']
             return len(front_path) == 0 or (len(front_path) <= len(paths) and front_path == paths[:len(front_path)])
 
-        matching_elem = self._paginate_data(url, err_msg, page_processor)
+        def elem_selector(elements):
+            elem = elements[0]
+            for e in elements:
+                if e['sort_order'] < elem['sort_order']:
+                    elem = e
+
+            return elem
+
+        matching_elem = self._paginate_data(url, err_msg, page_processor, elem_selector)
 
         # If the API is configured to accept access tokens from an external IDP save its external id
         app_id = None
-        if 'idp_app_id' in matching_elem['settings'] and len(matching_elem['settings']['idp_app_id']):
+        if 'idp_app_id' in matching_elem['settings'] and matching_elem['settings']['idp_app_id'] is not None \
+                and len(matching_elem['settings']['idp_app_id']):
+
             app_id = matching_elem['settings']['idp_app_id']
 
         return app_id
