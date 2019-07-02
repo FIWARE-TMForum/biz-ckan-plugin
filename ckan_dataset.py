@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2015 - 2017 CoNWeT Lab., Universidad Politécnica de Madrid
+# Copyright (c) 2019 Future Internet Consulting and Development Solutions S.L.
 
 # This file is part of BAE CKAN plugin.
 
@@ -68,7 +69,7 @@ class CKANDataset(Plugin):
         ckan_server, dataset_id = self.get_ckan_info(url)
 
         # Create headers for the requests
-        headers = {'X-Auth-token': user.userprofile.access_token}
+        headers = {'Authorization': 'Bearer ' + user.userprofile.access_token}
 
         # Get dataset metainfo
         meta_url = urljoin(ckan_server, 'api/action/package_show?id=' + dataset_id)
@@ -95,7 +96,7 @@ class CKANDataset(Plugin):
         user_info = user_info_res.json()
 
         # Validate owner
-        if user_info['result']['name'] != user.username:
+        if user_info['result']['name'] != user.userprofile.actor_id:
             raise PermissionDenied('Invalid resource: The user is not the owner of the dataset')
 
     def on_pre_product_spec_validation(self, provider, asset_t, media_type, url):
@@ -107,8 +108,9 @@ class CKANDataset(Plugin):
         notification_url = urljoin(ckan_server, path)
 
         # Build notification data
+        user = User.objects.get(username=order.owner_organization.name)
         data = {
-            'customer_name': order.owner_organization.name,
+            'customer_name': user.userprofile.actor_id,
             'resources': [{
                 'url': asset.get_url()
             }]
